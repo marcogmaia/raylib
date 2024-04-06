@@ -777,7 +777,7 @@ RMAPI Vector3 Vector3Normalize(Vector3 v)
 RMAPI Vector3 Vector3Project(Vector3 v1, Vector3 v2)
 {
     Vector3 result = { 0 };
-    
+
     float v1dv2 = (v1.x*v2.x + v1.y*v2.y + v1.z*v2.z);
     float v2dv2 = (v2.x*v2.x + v2.y*v2.y + v2.z*v2.z);
 
@@ -794,7 +794,7 @@ RMAPI Vector3 Vector3Project(Vector3 v1, Vector3 v2)
 RMAPI Vector3 Vector3Reject(Vector3 v1, Vector3 v2)
 {
     Vector3 result = { 0 };
-    
+
     float v1dv2 = (v1.x*v2.x + v1.y*v2.y + v1.z*v2.z);
     float v2dv2 = (v2.x*v2.x + v2.y*v2.y + v2.z*v2.z);
 
@@ -1213,7 +1213,7 @@ RMAPI Vector3 Vector3Refract(Vector3 v, Vector3 n, float r)
 RMAPI Vector4 Vector4Zero(void)
 {
     Vector4 result = { 0.0f, 0.0f, 0.0f, 0.0f };
-    return result;   
+    return result;
 }
 
 RMAPI Vector4 Vector4One(void)
@@ -1296,7 +1296,7 @@ RMAPI float Vector4Distance(Vector4 v1, Vector4 v2)
 // Calculate square distance between two vectors
 RMAPI float Vector4DistanceSqr(Vector4 v1, Vector4 v2)
 {
-    float result = 
+    float result =
         (v1.x - v2.x)*(v1.x - v2.x) + (v1.y - v2.y)*(v1.y - v2.y) +
         (v1.z - v2.z)*(v1.z - v2.z) + (v1.w - v2.w)*(v1.w - v2.w);
 
@@ -2338,8 +2338,7 @@ RMAPI Quaternion QuaternionFromAxisAngle(Vector3 axis, float angle)
         float ilength = 0.0f;
 
         // Vector3Normalize(axis)
-        Vector3 v = axis;
-        length = sqrtf(v.x*v.x + v.y*v.y + v.z*v.z);
+        length = axisLength;
         if (length == 0.0f) length = 1.0f;
         ilength = 1.0f/length;
         axis.x *= ilength;
