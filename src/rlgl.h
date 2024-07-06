@@ -590,7 +590,7 @@ RLAPI void rlMultMatrixf(const float *matf);            // Multiply the current 
 RLAPI void rlFrustum(double left, double right, double bottom, double top, double znear, double zfar);
 RLAPI void rlOrtho(double left, double right, double bottom, double top, double znear, double zfar);
 RLAPI void rlViewport(int x, int y, int width, int height); // Set the viewport area
-RLAPI void rlSetClipPlanes(double near, double far);    // Set clip planes distances
+RLAPI void rlSetClipPlanes(double nearPlane, double farPlane);    // Set clip planes distances
 RLAPI double rlGetCullDistanceNear(void);               // Get cull plane distance near
 RLAPI double rlGetCullDistanceFar(void);                // Get cull plane distance far
 
@@ -844,9 +844,9 @@ RLAPI void rlLoadDrawQuad(void);     // Load and draw a quad
     #define GL_GLEXT_PROTOTYPES
     #include <GLES2/gl2ext.h>           // OpenGL ES 2.0 extensions library
 #elif defined(GRAPHICS_API_OPENGL_ES2)
-    // NOTE: OpenGL ES 2.0 can be enabled on PLATFORM_DESKTOP,
+    // NOTE: OpenGL ES 2.0 can be enabled on Desktop platforms,
     // in that case, functions are loaded from a custom glad for OpenGL ES 2.0
-    #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_DESKTOP_SDL)
+    #if defined(PLATFORM_DESKTOP_GLFW) || defined(PLATFORM_DESKTOP_SDL)
         #define GLAD_GLES2_IMPLEMENTATION
         #include "external/glad_gles2.h"
     #else
@@ -1371,10 +1371,10 @@ void rlViewport(int x, int y, int width, int height)
 }
 
 // Set clip planes distances
-void rlSetClipPlanes(double near, double far)
+void rlSetClipPlanes(double nearPlane, double farPlane)
 {
-    rlCullDistanceNear = near;
-    rlCullDistanceFar = far;
+    rlCullDistanceNear = nearPlane;
+    rlCullDistanceFar = farPlane;
 }
 
 // Get cull plane distance near
@@ -1406,7 +1406,7 @@ void rlBegin(int mode)
     }
 }
 
-void rlEnd() { glEnd(); }
+void rlEnd(void) { glEnd(); }
 void rlVertex2i(int x, int y) { glVertex2i(x, y); }
 void rlVertex2f(float x, float y) { glVertex2f(x, y); }
 void rlVertex3f(float x, float y, float z) { glVertex3f(x, y, z); }
@@ -1560,7 +1560,7 @@ void rlNormal3f(float x, float y, float z)
     float length = sqrtf(normalx*normalx + normaly*normaly + normalz*normalz);
     if (length != 0.0f)
     {
-        float ilength = 1.0f / length;
+        float ilength = 1.0f/length;
         normalx *= ilength;
         normaly *= ilength;
         normalz *= ilength;
@@ -2390,7 +2390,7 @@ void rlLoadExtensions(void *loader)
 
 #elif defined(GRAPHICS_API_OPENGL_ES2)
 
-    #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_DESKTOP_SDL)
+    #if defined(PLATFORM_DESKTOP_GLFW) || defined(PLATFORM_DESKTOP_SDL)
     // TODO: Support GLAD loader for OpenGL ES 3.0
     if (gladLoadGLES2((GLADloadfunc)loader) == 0) TRACELOG(RL_LOG_WARNING, "GLAD: Cannot load OpenGL ES2.0 functions");
     else TRACELOG(RL_LOG_INFO, "GLAD: OpenGL ES 2.0 loaded successfully");
@@ -3945,7 +3945,9 @@ void rlSetVertexAttribute(unsigned int index, int compSize, int type, bool norma
     // Additional types (depends on OpenGL version or extensions):
     //  - GL_HALF_FLOAT, GL_FLOAT, GL_DOUBLE, GL_FIXED,
     //  - GL_INT_2_10_10_10_REV, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_INT_10F_11F_11F_REV
-    glVertexAttribPointer(index, compSize, type, normalized, stride, (void *)offset);
+
+    size_t offsetNative = offset;
+    glVertexAttribPointer(index, compSize, type, normalized, stride, (void *)offsetNative);
 #endif
 }
 
@@ -4518,7 +4520,7 @@ Matrix rlGetMatrixTransform(void)
 }
 
 // Get internal projection matrix for stereo render (selected eye)
-RLAPI Matrix rlGetMatrixProjectionStereo(int eye)
+Matrix rlGetMatrixProjectionStereo(int eye)
 {
     Matrix mat = rlMatrixIdentity();
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
@@ -4528,7 +4530,7 @@ RLAPI Matrix rlGetMatrixProjectionStereo(int eye)
 }
 
 // Get internal view offset matrix for stereo render (selected eye)
-RLAPI Matrix rlGetMatrixViewOffsetStereo(int eye)
+Matrix rlGetMatrixViewOffsetStereo(int eye)
 {
     Matrix mat = rlMatrixIdentity();
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
