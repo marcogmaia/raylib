@@ -26,7 +26,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2013-2024 Ramon Santamaria (@raysan5) and contributors
+*   Copyright (c) 2013-2025 Ramon Santamaria (@raysan5) and contributors
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -133,6 +133,7 @@ static void CursorEnterCallback(GLFWwindow *window, int enter);                 
 static EM_BOOL EmscriptenFullscreenChangeCallback(int eventType, const EmscriptenFullscreenChangeEvent *event, void *userData);
 // static EM_BOOL EmscriptenWindowResizedCallback(int eventType, const EmscriptenUiEvent *event, void *userData);
 static EM_BOOL EmscriptenResizeCallback(int eventType, const EmscriptenUiEvent *event, void *userData);
+static EM_BOOL EmscriptenFocusCallback(int eventType, const EmscriptenFocusEvent *focusEvent, void *userData);
 
 // Emscripten input callback events
 static EM_BOOL EmscriptenMouseMoveCallback(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData);
@@ -319,7 +320,7 @@ void ToggleBorderlessWindowed(void)
 // Set window state: maximized, if resizable
 void MaximizeWindow(void)
 {
-    if (glfwGetWindowAttrib(platform.handle, GLFW_RESIZABLE) == GLFW_TRUE && !(CORE.Window.flags & FLAG_WINDOW_MAXIMIZED))
+    if ((glfwGetWindowAttrib(platform.handle, GLFW_RESIZABLE) == GLFW_TRUE) && !(CORE.Window.flags & FLAG_WINDOW_MAXIMIZED))
     {
         platform.unmaximizedWidth = CORE.Window.screen.width;
         platform.unmaximizedHeight = CORE.Window.screen.height;
@@ -342,7 +343,7 @@ void MinimizeWindow(void)
 // Set window state: not minimized/maximized
 void RestoreWindow(void)
 {
-    if (glfwGetWindowAttrib(platform.handle, GLFW_RESIZABLE) == GLFW_TRUE && (CORE.Window.flags & FLAG_WINDOW_MAXIMIZED))
+    if ((glfwGetWindowAttrib(platform.handle, GLFW_RESIZABLE) == GLFW_TRUE) && (CORE.Window.flags & FLAG_WINDOW_MAXIMIZED))
     {
         if (platform.unmaximizedWidth && platform.unmaximizedHeight) glfwSetWindowSize(platform.handle, platform.unmaximizedWidth, platform.unmaximizedHeight);
 
@@ -771,8 +772,11 @@ Vector2 GetWindowPosition(void)
 // Get window scale DPI factor for current monitor
 Vector2 GetWindowScaleDPI(void)
 {
-    TRACELOG(LOG_WARNING, "GetWindowScaleDPI() not implemented on target platform");
-    return (Vector2){ 1.0f, 1.0f };
+    // NOTE: Returned scale is relative to the current monitor where the browser window is located
+    Vector2 scale = { 1.0f, 1.0f };
+    scale.x = (float)EM_ASM_DOUBLE( { return window.devicePixelRatio; } );
+    scale.y = scale.x;
+    return scale;
 }
 
 // Set clipboard text content
@@ -1366,6 +1370,10 @@ int InitPlatform(void)
     // Support gamepad events (not provided by GLFW3 on emscripten)
     emscripten_set_gamepadconnected_callback(NULL, 1, EmscriptenGamepadCallback);
     emscripten_set_gamepaddisconnected_callback(NULL, 1, EmscriptenGamepadCallback);
+
+    // Support focus events
+    emscripten_set_blur_callback("#canvas", platform.handle, 1, EmscriptenFocusCallback);
+    emscripten_set_focus_callback("#canvas", platform.handle, 1, EmscriptenFocusCallback);
     //----------------------------------------------------------------------------
 
     // Initialize timing system
@@ -1661,10 +1669,10 @@ static EM_BOOL EmscriptenResizeCallback(int eventType, const EmscriptenUiEvent *
     int height = EM_ASM_INT( return window.innerHeight; );
 
     if (width < (int)CORE.Window.screenMin.width) width = CORE.Window.screenMin.width;
-    else if (width > (int)CORE.Window.screenMax.width && CORE.Window.screenMax.width > 0) width = CORE.Window.screenMax.width;
+    else if ((width > (int)CORE.Window.screenMax.width) && (CORE.Window.screenMax.width > 0)) width = CORE.Window.screenMax.width;
 
     if (height < (int)CORE.Window.screenMin.height) height = CORE.Window.screenMin.height;
-    else if (height > (int)CORE.Window.screenMax.height && CORE.Window.screenMax.height > 0) height = CORE.Window.screenMax.height;
+    else if ((height > (int)CORE.Window.screenMax.height) && (CORE.Window.screenMax.height > 0)) height = CORE.Window.screenMax.height;
 
     emscripten_set_canvas_element_size("#canvas", width, height);
 
@@ -1719,7 +1727,7 @@ static EM_BOOL EmscriptenGamepadCallback(int eventType, const EmscriptenGamepadE
     for (int i = 0; i < gamepadEvent->numButtons; ++i) TRACELOGD("Button %d: Digital: %d, Analog: %g", i, gamepadEvent->digitalButton[i], gamepadEvent->analogButton[i]);
     */
 
-    if ((gamepadEvent->connected) && (gamepadEvent->index < MAX_GAMEPADS))
+    if (gamepadEvent->connected && (gamepadEvent->index < MAX_GAMEPADS))
     {
         CORE.Input.Gamepad.ready[gamepadEvent->index] = true;
         sprintf(CORE.Input.Gamepad.name[gamepadEvent->index], "%s", gamepadEvent->id);
@@ -1727,6 +1735,18 @@ static EM_BOOL EmscriptenGamepadCallback(int eventType, const EmscriptenGamepadE
     else CORE.Input.Gamepad.ready[gamepadEvent->index] = false;
 
     return 1; // The event was consumed by the callback handler
+}
+
+static EM_BOOL EmscriptenFocusCallback(int eventType, const EmscriptenFocusEvent *focusEvent, void *userData)
+{
+    EM_BOOL consumed = 1;
+    switch (eventType)
+    {
+        case EMSCRIPTEN_EVENT_BLUR: WindowFocusCallback(userData, 0); break;
+        case EMSCRIPTEN_EVENT_FOCUS: WindowFocusCallback(userData, 1); break;
+        default: consumed = 0; break;
+    }
+    return consumed;
 }
 
 // Register touch input events
@@ -1792,7 +1812,23 @@ static EM_BOOL EmscriptenTouchCallback(int eventType, const EmscriptenTouchEvent
 
     if (eventType == EMSCRIPTEN_EVENT_TOUCHEND)
     {
-        CORE.Input.Touch.pointCount--;
+        // Identify the EMSCRIPTEN_EVENT_TOUCHEND and remove it from the list
+        for (int i = 0; i < CORE.Input.Touch.pointCount; i++)
+        {
+            if (touchEvent->touches[i].isChanged)
+            {
+                // Move all touch points one position up
+                for (int j = i; j < CORE.Input.Touch.pointCount - 1; j++)
+                {
+                    CORE.Input.Touch.pointId[j] = CORE.Input.Touch.pointId[j + 1];
+                    CORE.Input.Touch.position[j] = CORE.Input.Touch.position[j + 1];
+                }
+                // Decrease touch points count to remove the last one
+                CORE.Input.Touch.pointCount--;
+                break;
+            }
+        }
+        // Clamp pointCount to avoid negative values
         if (CORE.Input.Touch.pointCount < 0) CORE.Input.Touch.pointCount = 0;
     }
 
