@@ -1431,7 +1431,7 @@ Function 082: SetShaderValueMatrix() (3 input parameters)
 Function 083: SetShaderValueTexture() (3 input parameters)
   Name: SetShaderValueTexture
   Return type: void
-  Description: Set shader uniform value for texture (sampler2d)
+  Description: Set shader uniform value and bind the texture (sampler2d)
   Param[1]: shader (type: Shader)
   Param[2]: locIndex (type: int)
   Param[3]: texture (type: Texture2D)
@@ -4659,7 +4659,7 @@ Function 578: SetAudioStreamCallback() (2 input parameters)
 Function 579: AttachAudioStreamProcessor() (2 input parameters)
   Name: AttachAudioStreamProcessor
   Return type: void
-  Description: Attach audio stream processor to stream, receives the samples as 'float'
+  Description: Attach audio stream processor to stream, receives frames x 2 samples as 'float' (stereo)
   Param[1]: stream (type: AudioStream)
   Param[2]: processor (type: AudioCallback)
 Function 580: DetachAudioStreamProcessor() (2 input parameters)
@@ -4671,7 +4671,7 @@ Function 580: DetachAudioStreamProcessor() (2 input parameters)
 Function 581: AttachAudioMixedProcessor() (1 input parameters)
   Name: AttachAudioMixedProcessor
   Return type: void
-  Description: Attach audio stream processor to the entire audio pipeline, receives the samples as 'float'
+  Description: Attach audio stream processor to the entire audio pipeline, receives frames x 2 samples as 'float' (stereo)
   Param[1]: processor (type: AudioCallback)
 Function 582: DetachAudioMixedProcessor() (1 input parameters)
   Name: DetachAudioMixedProcessor
