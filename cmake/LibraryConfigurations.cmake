@@ -108,7 +108,6 @@ elseif ("${PLATFORM}" STREQUAL "SDL")
 elseif ("${PLATFORM}" STREQUAL "SDL3")
     find_package(SDL3 REQUIRED)
     set(PLATFORM_CPP "PLATFORM_DESKTOP_SDL")
-    message(STATUS debug sdl3 include: "${INTERFACE_INCLUDE_DIRECTORIES}/SDL3" )
     set(LIBS_PRIVATE SDL3::SDL3)
 
 endif ()
