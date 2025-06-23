@@ -106,7 +106,7 @@ elseif ("${PLATFORM}" STREQUAL "SDL")
     set(LIBS_PRIVATE SDL2::SDL2)
 
 elseif ("${PLATFORM}" STREQUAL "SDL3")
-    find_package(SDL3 REQUIRED)
+    find_package(SDL3 CONFIG REQUIRED)
     set(PLATFORM_CPP "PLATFORM_DESKTOP_SDL")
     set(LIBS_PRIVATE SDL3::SDL3)
 
@@ -139,6 +139,6 @@ endif ()
 
 set(LIBS_PRIVATE ${LIBS_PRIVATE} ${OPENAL_LIBRARY})
 
-if (${PLATFORM} MATCHES "Desktop")
+if (${PLATFORM} MATCHES "Desktop" AND NOT ${PLATFORM} MATCHES "SDL")
     set(LIBS_PRIVATE ${LIBS_PRIVATE} glfw)
 endif ()

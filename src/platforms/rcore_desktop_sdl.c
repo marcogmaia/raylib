@@ -53,13 +53,7 @@
     #define SDL_ENABLE_OLD_NAMES    // Just in case we're on SDL3, we need some in-between compatibily
 #endif
 #include "SDL3/SDL.h"                // SDL base library (window/rendered, input, timing... functionality)
-
-#if defined(GRAPHICS_API_OPENGL_ES2)
-    // It seems it does not need to be included to work
-    //#include "SDL_opengles2.h"
-#else
-    #include "SDL3/SDL_opengl.h"     // SDL OpenGL functionality (if required, instead of internal renderer)
-#endif
+#include "SDL3/SDL_opengl.h"     // SDL OpenGL functionality (if required, instead of internal renderer)
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -68,7 +62,7 @@
     #define MAX_CLIPBOARD_BUFFER_LENGTH 1024 // Size of the clipboard buffer used on GetClipboardText()
 #endif
 
-#if ((defined(SDL_MAJOR_VERSION) && (SDL_MAJOR_VERSION == 3)) && (defined(SDL_MINOR_VERSION) && (SDL_MINOR_VERSION >= 1)))
+#if (SDL_MAJOR_VERSION == 3 && SDL_MINOR_VERSION >= 1)
     #ifndef PLATFORM_DESKTOP_SDL3
         #define PLATFORM_DESKTOP_SDL3
     #endif
