@@ -261,6 +261,9 @@ static const int CursorsLUT[] = {
 const char *SDL_GameControllerNameForIndex(int joystickIndex)
 {
     // NOTE: SDL3 uses the IDs itself (SDL_JoystickID) instead of SDL2 joystick_index
+    #ifdef PLATFORM_DESKTOP_SDL3
+    return SDL_GetGamepadNameForID((SDL_JoystickID)joystickIndex);
+    #else
     const char *name = NULL;
     int numJoysticks = 0;
     SDL_JoystickID *joysticks = SDL_GetJoysticks(&numJoysticks);
@@ -277,6 +280,7 @@ const char *SDL_GameControllerNameForIndex(int joystickIndex)
     }
 
     return name;
+    #endif
 }
 
 int SDL_GetNumVideoDisplays(void)
@@ -1680,7 +1684,7 @@ void PollInputEvents(void)
             {
                 int jid = event.jdevice.which; // Joystick device index
 
-                if (CORE.Input.Gamepad.ready[jid] && (jid < MAX_GAMEPADS))
+                if (jid < MAX_GAMEPADS)
                 {
                     platform.gamepad[jid] = SDL_GameControllerOpen(jid);
                     platform.gamepadId[jid] = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(platform.gamepad[jid]));
