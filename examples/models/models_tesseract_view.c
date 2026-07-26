@@ -6,7 +6,7 @@
 *
 *   Example complexity rating: [★★☆☆] 2/4
 *
-*   Example originally created with raylib 5.6-dev, last time updated with raylib 5.6-dev
+*   Example originally created with raylib 6.0, last time updated with raylib 6.0
 *
 *   Example contributed by Timothy van der Valk (@arceryz) and reviewed by Ramon Santamaria (@raysan5)
 *
@@ -65,7 +65,7 @@ int main(void)
     {
         // Update
         //----------------------------------------------------------------------------------
-        rotation = DEG2RAD*45.0f*GetTime();
+        rotation = DEG2RAD*45.0f*(float)GetTime();
 
         for (int i = 0; i < 16; i++)
         {

@@ -98,10 +98,16 @@ if (${PLATFORM} MATCHES "Android")
 
 elseif (${PLATFORM} MATCHES "Web")
     set(example_sources) # clear example_sources
-    list(APPEND example_sources others/web_basic_window.c)
     list(APPEND example_sources core/core_input_gestures_testbed.c)
 
 elseif ("${PLATFORM}" STREQUAL "DRM")
+    list(REMOVE_ITEM example_sources ${CMAKE_CURRENT_SOURCE_DIR}/others/rlgl_standalone.c)
+    list(REMOVE_ITEM example_sources ${CMAKE_CURRENT_SOURCE_DIR}/others/raylib_opengl_interop.c)
+
+elseif ("${PLATFORM}" MATCHES "Memory")
+    list(REMOVE_ITEM example_sources ${CMAKE_CURRENT_SOURCE_DIR}/others/raylib_opengl_interop.c)
+
+elseif ("${OPENGL_VERSION}" STREQUAL "Software")
     list(REMOVE_ITEM example_sources ${CMAKE_CURRENT_SOURCE_DIR}/others/rlgl_standalone.c)
     list(REMOVE_ITEM example_sources ${CMAKE_CURRENT_SOURCE_DIR}/others/raylib_opengl_interop.c)
 
@@ -185,6 +191,18 @@ foreach (example_source ${example_sources})
             target_link_libraries(${example_name} "-framework OpenGL")
         endif()
 
+    elseif (${PLATFORM} MATCHES "RGFW")
+        if (APPLE)
+            target_link_libraries(${example_name} "-framework IOKit")
+            target_link_libraries(${example_name} "-framework Cocoa")
+            target_link_libraries(${example_name} "-framework OpenGL")
+        elseif (WIN32)
+            target_link_libraries(${example_name} "-lgdi32")
+            target_link_libraries(${example_name} "-lwinmm")
+        elseif (UNIX)
+            target_link_libraries(${example_name} "-lX11")
+            target_link_libraries(${example_name} "-lXrandr")
+        endif()
     endif ()
 endforeach ()
 

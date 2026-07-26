@@ -7,7 +7,7 @@
 *   NOTE: This example requires raylib OpenGL 3.3 or ES2 versions for shaders support,
 *        OpenGL 1.1 does not support shaders, recompile raylib to OpenGL 3.3 version
 *
-*   Example originally created with raylib 5.6, last time updated with raylib 5.6
+*   Example originally created with raylib 6.0, last time updated with raylib 6.0
 *
 *   Example contributed by Jeremy Montgomery (@Sir_Irk) and reviewed by Ramon Santamaria (@raysan5)
 *
@@ -49,7 +49,7 @@ int main(void)
     camera.projection = CAMERA_PERSPECTIVE;
 
     // Load basic normal map lighting shader
-    Shader shader = LoadShader(TextFormat("resources/shaders/glsl%i/normalmap.vs", GLSL_VERSION), 
+    Shader shader = LoadShader(TextFormat("resources/shaders/glsl%i/normalmap.vs", GLSL_VERSION),
                                TextFormat("resources/shaders/glsl%i/normalmap.fs", GLSL_VERSION));
 
     // Get some required shader locations
@@ -113,7 +113,7 @@ int main(void)
         if (IsKeyPressed(KEY_N)) useNormalMap = !useNormalMap;
 
         // Spin plane model at a constant rate
-        plane.transform = MatrixRotateY(GetTime()*0.5f);
+        plane.transform = MatrixRotateY((float)GetTime()*0.5f);
 
         // Update shader values
         float lightPos[3] = {lightPosition.x, lightPosition.y, lightPosition.z};
