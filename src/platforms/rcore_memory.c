@@ -477,7 +477,7 @@ void PollInputEvents(void)
     if (kbhit())
     {
         int key = getch();
-        if (key == 27) CORE.Window.shouldClose = true; // KEY_SCAPE
+        if (key == 27) CORE.Window.shouldClose = true; // KEY_ESCAPE
     }
 }
 
@@ -554,7 +554,7 @@ int InitPlatform(void)
 // Close platform
 void ClosePlatform(void)
 {
-    RL_FREE(platform.pixels);
+    RL_FREE(platform.pixels); // Free pixels buffer
 }
 
 //----------------------------------------------------------------------------------

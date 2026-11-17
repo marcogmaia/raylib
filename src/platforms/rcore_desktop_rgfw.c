@@ -576,7 +576,7 @@ static void RGFW_cb_windowresizefunc(const RGFW_event *e)
         if (platform.surfacePixels != NULL)
         {
             RL_FREE(platform.surfacePixels);
-            platform.surfacePixels = RL_MALLOC(platform.surfaceWidth*platform.surfaceHeight*4);
+            platform.surfacePixels = RL_CALLOC(platform.surfaceWidth*platform.surfaceHeight*4, 1);
         }
 
         if (platform.surface != NULL)
@@ -613,7 +613,7 @@ static void RGFW_cb_windowmovefunc(const RGFW_event *e)
     if (e->common.win != platform.window) return;
 
     CORE.Window.position.x = platform.window->x;
-    CORE.Window.position.y = platform.window->x;
+    CORE.Window.position.y = platform.window->y;
 }
 static void RGFW_cb_keycharfunc(const RGFW_event *e)
 {
@@ -735,7 +735,7 @@ static void RGFW_cb_keyfunc(const RGFW_keyEvent* e)
 
         CORE.Input.Keyboard.currentKeyState[key] = 1;
 
-        if (CORE.Input.Keyboard.currentKeyState[CORE.Input.Keyboard.exitKey]) RGFW_window_setShouldClose(platform.window, true);
+        if ((key == CORE.Input.Keyboard.exitKey) && !e->repeat) RGFW_window_setShouldClose(platform.window, true);
     }
     else
     {
@@ -1329,7 +1329,12 @@ Image GetClipboardImage(void)
     fileData = (void *)Win32GetClipboardImageData(&width, &height, &dataSize);
 
     if (fileData == NULL) TRACELOG(LOG_WARNING, "Clipboard image: Couldn't get clipboard data");
-    else image = LoadImageFromMemory(".bmp", (const unsigned char *)fileData, (int)dataSize);
+    else
+    {
+        image = LoadImageFromMemory(".bmp", (const unsigned char *)fileData, (int)dataSize);
+
+        RL_FREE(fileData);
+    }
 
 #elif defined(__linux__) && defined(DRGFW_X11)
 
@@ -1595,6 +1600,8 @@ void PollInputEvents(void)
     // Poll input events for current platform
     //-----------------------------------------------------------------------------
     CORE.Window.resizedLastFrame = false;
+    CORE.Window.shouldClose = false;
+    RGFW_window_setShouldClose(platform.window, false);
 
     CORE.Input.Mouse.previousPosition = CORE.Input.Mouse.currentPosition;
     if (RGFW_window_isCaptured(platform.window))
@@ -1613,11 +1620,11 @@ void PollInputEvents(void)
     }
 
     //-----------------------------------------------------------------------------
-    // using RGFW callbacks instead of polling
+    // Using RGFW callbacks instead of polling
     RGFW_pollEvents();
     //-----------------------------------------------------------------------------
 
-    mg_event gamepad_event;
+    mg_event gamepad_event = { 0 };
     while (mg_gamepads_check_event(&platform.minigamepad, &gamepad_event))
     {
         int gamepadIndex = gamepad_event.gamepad->index;
@@ -1880,13 +1887,7 @@ int InitPlatform(void)
 
         platform.surfaceWidth = CORE.Window.currentFbo.width;
         platform.surfaceHeight = CORE.Window.currentFbo.height;
-
-        platform.surfacePixels = RL_MALLOC(platform.surfaceWidth*platform.surfaceHeight*4);
-        if (platform.surfacePixels == NULL)
-        {
-            TRACELOG(LOG_FATAL, "PLATFORM: Failed to initialize software pixel buffer");
-            return -1;
-        }
+        platform.surfacePixels = RL_CALLOC(platform.surfaceWidth*platform.surfaceHeight*4, 1);
 
         platform.surface = RGFW_window_createSurface(platform.window, platform.surfacePixels, platform.surfaceWidth, platform.surfaceHeight, RGFW_formatBGRA8);
 
@@ -2015,20 +2016,13 @@ int InitPlatform(void)
 // Close platform
 void ClosePlatform(void)
 {
-    mg_gamepads_free(&platform.minigamepad);
+    mg_gamepads_free(&platform.minigamepad); // Clear gamepad data
     RGFW_window_close(platform.window);
 
-    #if defined(GRAPHICS_API_OPENGL_SOFTWARE)
-        if (platform.surfacePixels != NULL)
-        {
-            RL_FREE(platform.surfacePixels);
-        }
-
-        if (platform.surface != NULL)
-        {
-            RGFW_surface_free(platform.surface);
-        }
-    #endif
+#if defined(GRAPHICS_API_OPENGL_SOFTWARE)
+    if (platform.surfacePixels != NULL) RL_FREE(platform.surfacePixels);
+    if (platform.surface != NULL) RGFW_surface_free(platform.surface);
+#endif
 }
 
 // Keycode mapping

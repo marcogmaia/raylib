@@ -151,10 +151,6 @@
     #include "external/rprand.h"
 #endif
 
-#if defined(__linux__) && !defined(_GNU_SOURCE)
-    #define _GNU_SOURCE
-#endif
-
 // Platform specific defines to handle GetApplicationDirectory()
 #if defined(_WIN32)
     #if !defined(MAX_PATH)
@@ -165,6 +161,7 @@
     #if defined(__cplusplus)
     extern "C" {
     #endif
+    __declspec(dllimport) unsigned long __stdcall GetFileAttributesA(const char *lpFileName);
     __declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(struct HINSTANCE__ *hModule, char *lpFilename, unsigned long nSize);
     __declspec(dllimport) unsigned long __stdcall GetModuleFileNameW(struct HINSTANCE__ *hModule, wchar_t *lpFilename, unsigned long nSize);
     __declspec(dllimport) int __stdcall WideCharToMultiByte(unsigned int cp, unsigned long flags, const wchar_t *widestr, int cchwide, char *str, int cbmb, const char *defchar, int *used_default);
@@ -185,10 +182,13 @@
 #endif
 
 #define _CRT_INTERNAL_NONSTDC_NAMES  1
-#include <sys/stat.h>               // Required for: stat(), S_ISREG [Used in GetFileModTime(), IsFilePath()]
+#include <sys/stat.h>               // Required for: stat(), S_ISREG, S_ISDIR [Used in GetFileModTime(), IsPathFile(), IsPathDirectory()]
 
 #if !defined(S_ISREG) && defined(S_IFMT) && defined(S_IFREG)
     #define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
+    #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
 #endif
 
 #if defined(_WIN32) && (defined(_MSC_VER) || defined(__TINYC__))
@@ -227,7 +227,7 @@
 #endif
 #ifndef MAX_FILEPATH_LENGTH
     #if defined(_WIN32)
-        #define MAX_FILEPATH_LENGTH      256        // On Win32, MAX_PATH = 260 (limits.h) but Windows 10, Version 1607 enables long paths...
+        #define MAX_FILEPATH_LENGTH      260        // On Win32, MAX_PATH = 260 (limits.h) but Windows 10, Version 1607 enables long paths...
     #else
         #define MAX_FILEPATH_LENGTH     4096        // On Linux, PATH_MAX = 4096 by default (limits.h)
     #endif
@@ -382,6 +382,7 @@ typedef struct CoreData {
             float axisState[MAX_GAMEPADS][MAX_GAMEPAD_AXES];                // Gamepad axes state
 
         } Gamepad;
+
     } Input;
     struct {
         double current;                     // Current time measure (seconds)
@@ -447,8 +448,10 @@ typedef enum AutomationEventType {
     ACTION_SETTARGETFPS             // param[0]: fps
 } AutomationEventType;
 
+#define MAX_AUTOMATION_EVENT_TYPES  24
+
 // Event type name strings, required for export
-static const char *autoEventTypeName[] = {
+static const char *autoEventTypeName[MAX_AUTOMATION_EVENT_TYPES] = {
     "EVENT_NONE",
     "INPUT_KEY_UP",
     "INPUT_KEY_DOWN",
@@ -477,7 +480,7 @@ static const char *autoEventTypeName[] = {
 
 static AutomationEventList *currentEventList = NULL;        // Current automation events list, set by user, keep internal pointer
 static bool automationEventRecording = false;               // Recording automation events flag
-//static short automationEventEnabled = 0b0000001111111111; // TODO: Automation events enabled for recording/playing
+//static short automationEventEnabled = 0b0000001111111111; // Automation events enabled for recording/playing
 #endif
 //-----------------------------------------------------------------------------------
 
@@ -534,8 +537,6 @@ const char *TextFormat(const char *text, ...); // Formatting of text with variab
 #elif defined(PLATFORM_MEMORY)
     #include "platforms/rcore_memory.c"
 #else
-    // TODO: Include your custom platform backend!
-    // i.e software rendering backend or console backend!
     #pragma message ("WARNING: No [rcore] platform defined")
 #endif
 
@@ -610,8 +611,6 @@ void InitWindow(int width, int height, const char *title)
 #elif defined(PLATFORM_MEMORY)
     TRACELOG(LOG_INFO, "Platform backend: MEMORY (No OS)");
 #else
-    // TODO: Include your custom platform backend!
-    // i.e software rendering backend or console backend!
     TRACELOG(LOG_INFO, "Platform backend: CUSTOM");
 #endif
 
@@ -653,7 +652,6 @@ void InitWindow(int width, int height, const char *title)
     if ((title != NULL) && (title[0] != 0)) CORE.Window.title = title;
 
     // Initialize global input state
-    memset(&CORE.Input, 0, sizeof(CORE.Input)); // Reset CORE.Input structure to 0
     CORE.Input.Keyboard.exitKey = KEY_ESCAPE;
     CORE.Input.Mouse.scale = (Vector2){ 1.0f, 1.0f };
     CORE.Input.Mouse.cursor = MOUSE_CURSOR_ARROW;
@@ -715,15 +713,16 @@ void InitWindow(int width, int height, const char *title)
     #endif
 #endif
 
+    // NOTE: Should be already initialized to 0 but just in case
     CORE.Time.frameCounter = 0;
     CORE.Window.shouldClose = false;
 
     // Initialize random seed using available timer source instead of standard time() on embedded platforms
-    #ifndef PICO_RP2350
+#ifndef PICO_RP2350
     SetRandomSeed((unsigned int)time(NULL));
-    #else
+#else
     SetRandomSeed(get_rand_32());
-    #endif
+#endif
 
     TRACELOG(LOG_INFO, "SYSTEM: Working Directory: %s", GetWorkingDirectory());
 }
@@ -742,7 +741,9 @@ void CloseWindow(void)
     ClosePlatform();
     //--------------------------------------------------------------
 
-    CORE.Window.ready = false;
+    // Clear CORE data, in case new window is initialized
+    CORE = (CoreData){ 0 };
+    
     TRACELOG(LOG_INFO, "Window closed successfully");
 }
 
@@ -961,16 +962,16 @@ void BeginMode3D(Camera camera)
     if (camera.projection == CAMERA_PERSPECTIVE)
     {
         // Setup perspective projection
-        double top = rlGetCullDistanceNear()*tan(camera.fovy*0.5*DEG2RAD);
-        double right = top*aspect;
+        float top = rlGetCullDistanceNear()*tanf(camera.fovy*0.5f*DEG2RAD);
+        float right = top*aspect;
 
         rlFrustum(-right, right, -top, top, rlGetCullDistanceNear(), rlGetCullDistanceFar());
     }
     else if (camera.projection == CAMERA_ORTHOGRAPHIC)
     {
         // Setup orthographic projection
-        double top = camera.fovy/2.0;
-        double right = top*aspect;
+        float top = camera.fovy/2.0f;
+        float right = top*aspect;
 
         rlOrtho(-right, right, -top,top, rlGetCullDistanceNear(), rlGetCullDistanceFar());
     }
@@ -1018,7 +1019,7 @@ void BeginTextureMode(RenderTexture2D target)
 
     // Set orthographic projection to current framebuffer size
     // NOTE: Configured top-left corner as (0, 0)
-    rlOrtho(0, target.texture.width, target.texture.height, 0, 0.0f, 1.0f);
+    rlOrtho(0.0f, (float)target.texture.width, (float)target.texture.height, 0.0f, 0.0f, 1.0f);
 
     rlMatrixMode(RL_MODELVIEW);     // Switch back to modelview matrix
     rlLoadIdentity();               // Reset current matrix (modelview)
@@ -1089,11 +1090,12 @@ void BeginScissorMode(int x, int y, int width, int height)
 #if defined(__APPLE__)
     if (!CORE.Window.usingFbo)
     {
-        Vector2 scale = GetWindowScaleDPI();
+        Vector2 scale = { 1.0f, 1.0f };
+        if (FLAG_IS_SET(CORE.Window.flags, FLAG_WINDOW_HIGHDPI) && !FLAG_IS_SET(CORE.Window.flags, FLAG_FULLSCREEN_MODE)) scale = GetWindowScaleDPI();
         rlScissor((int)(x*scale.x), (int)(GetScreenHeight()*scale.y - (((y + height)*scale.y))), (int)(width*scale.x), (int)(height*scale.y));
     }
 #else
-    if (!CORE.Window.usingFbo && FLAG_IS_SET(CORE.Window.flags, FLAG_WINDOW_HIGHDPI))
+    if (!CORE.Window.usingFbo && FLAG_IS_SET(CORE.Window.flags, FLAG_WINDOW_HIGHDPI) && !FLAG_IS_SET(CORE.Window.flags, FLAG_FULLSCREEN_MODE))
     {
         Vector2 scale = GetWindowScaleDPI();
         rlScissor((int)(x*scale.x), (int)(CORE.Window.currentFbo.height - (y + height)*scale.y), (int)(width*scale.x), (int)(height*scale.y));
@@ -1431,13 +1433,13 @@ Ray GetScreenToWorldRayEx(Vector2 position, Camera camera, int width, int height
     if (camera.projection == CAMERA_PERSPECTIVE)
     {
         // Calculate projection matrix from perspective
-        matProj = MatrixPerspective(camera.fovy*DEG2RAD, ((double)width/(double)height), rlGetCullDistanceNear(), rlGetCullDistanceFar());
+        matProj = MatrixPerspective(camera.fovy*DEG2RAD, (float)width/(float)height, rlGetCullDistanceNear(), rlGetCullDistanceFar());
     }
     else if (camera.projection == CAMERA_ORTHOGRAPHIC)
     {
-        double aspect = (double)width/(double)height;
-        double top = camera.fovy/2.0;
-        double right = top*aspect;
+        float aspect = (float)width/(float)height;
+        float top = camera.fovy/2.0f;
+        float right = top*aspect;
 
         // Calculate projection matrix from orthographic
         matProj = MatrixOrtho(-right, right, -top, top, rlGetCullDistanceNear(), rlGetCullDistanceFar());
@@ -1518,13 +1520,13 @@ Vector2 GetWorldToScreenEx(Vector3 position, Camera camera, int width, int heigh
     if (camera.projection == CAMERA_PERSPECTIVE)
     {
         // Calculate projection matrix from perspective
-        matProj = MatrixPerspective(camera.fovy*DEG2RAD, ((double)width/(double)height), rlGetCullDistanceNear(), rlGetCullDistanceFar());
+        matProj = MatrixPerspective(camera.fovy*DEG2RAD, (float)width/(float)height, rlGetCullDistanceNear(), rlGetCullDistanceFar());
     }
     else if (camera.projection == CAMERA_ORTHOGRAPHIC)
     {
-        double aspect = (double)width/(double)height;
-        double top = camera.fovy/2.0;
-        double right = top*aspect;
+        float aspect = (float)width/(float)height;
+        float top = camera.fovy/2.0f;
+        float right = top*aspect;
 
         // Calculate projection matrix from orthographic
         matProj = MatrixOrtho(-right, right, -top, top, rlGetCullDistanceNear(), rlGetCullDistanceFar());
@@ -1597,6 +1599,7 @@ int GetFPS(void)
     #define FPS_STEP (FPS_AVERAGE_TIME_SECONDS/FPS_CAPTURE_FRAMES_COUNT)
 
     static int index = 0;
+    static unsigned int captureFramesCounted = 0;
     static float history[FPS_CAPTURE_FRAMES_COUNT] = { 0 };
     static float average = 0, last = 0;
     float fpsFrame = GetFrameTime();
@@ -1607,6 +1610,7 @@ int GetFPS(void)
         average = 0;
         last = 0;
         index = 0;
+        captureFramesCounted = 0;
 
         for (int i = 0; i < FPS_CAPTURE_FRAMES_COUNT; i++) history[i] = 0;
     }
@@ -1620,9 +1624,11 @@ int GetFPS(void)
             average -= history[index];
             history[index] = fpsFrame/FPS_CAPTURE_FRAMES_COUNT;
             average += history[index];
+
+            if (captureFramesCounted < FPS_CAPTURE_FRAMES_COUNT) captureFramesCounted += 1;
         }
 
-        fps = (int)roundf(1.0f/average);
+        if (captureFramesCounted > 0) fps = (int)roundf(captureFramesCounted/(average*FPS_CAPTURE_FRAMES_COUNT));
     }
     else fps = 0;
 #endif
@@ -1819,12 +1825,8 @@ void TakeScreenshot(const char *fileName)
     // Security check to (partially) avoid malicious code
     if (strchr(fileName, '\'') != NULL) { TRACELOG(LOG_WARNING, "SYSTEM: Provided fileName could be potentially malicious, avoid [\'] character"); return; }
 
-    // Apply content scaling if required
-    Vector2 scale = { 1.0f, 1.0f };
-    if (FLAG_IS_SET(CORE.Window.flags, FLAG_WINDOW_HIGHDPI)) scale = GetWindowScaleDPI();
-
-    unsigned char *imgData = rlReadScreenPixels((int)((float)CORE.Window.render.width*scale.x), (int)((float)CORE.Window.render.height*scale.y));
-    Image image = { imgData, (int)((float)CORE.Window.render.width*scale.x), (int)((float)CORE.Window.render.height*scale.y), 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    unsigned char *imgData = rlReadScreenPixels(CORE.Window.render.width, CORE.Window.render.height);
+    Image image = { imgData, CORE.Window.render.width, CORE.Window.render.height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
 
     char path[MAX_FILEPATH_LENGTH] = { 0 };
     if (!IsPathAbsolute(fileName)) snprintf(path, MAX_FILEPATH_LENGTH, "%s", TextFormat("%s/%s", CORE.Storage.basePath, fileName));
@@ -1869,7 +1871,7 @@ void TraceLog(int logType, const char *text, ...)
     va_list args;
     va_start(args, text);
 
-    if (traceLog)
+    if (traceLog != NULL)
     {
         traceLog(logType, text, args);
         va_end(args);
@@ -1955,7 +1957,7 @@ unsigned char *LoadFileData(const char *fileName, int *dataSize)
 
     if (fileName != NULL)
     {
-        if (loadFileData) return loadFileData(fileName, dataSize);
+        if (loadFileData != NULL) return loadFileData(fileName, dataSize);
 
         FILE *file = fopen(fileName, "rb");
 
@@ -2019,7 +2021,7 @@ bool SaveFileData(const char *fileName, const void *data, int dataSize)
 
     if (fileName != NULL)
     {
-        if (saveFileData) return saveFileData(fileName, data, dataSize);
+        if (saveFileData != NULL) return saveFileData(fileName, data, dataSize);
 
         FILE *file = fopen(fileName, "wb");
 
@@ -2104,7 +2106,7 @@ char *LoadFileText(const char *fileName)
 
     if (fileName != NULL)
     {
-        if (loadFileText) return loadFileText(fileName);
+        if (loadFileText != NULL) return loadFileText(fileName);
 
         FILE *file = fopen(fileName, "rt");
 
@@ -2160,7 +2162,7 @@ bool SaveFileText(const char *fileName, const char *text)
 
     if (fileName != NULL)
     {
-        if (saveFileText) return saveFileText(fileName, text);
+        if (saveFileText != NULL) return saveFileText(fileName, text);
 
         FILE *file = fopen(fileName, "wt");
 
@@ -2243,16 +2245,16 @@ int FileCopy(const char *srcPath, const char *dstPath)
     int srcDataSize = 0;
     unsigned char *srcFileData = LoadFileData(srcPath, &srcDataSize);
 
-    // Create required paths if they do not exist
-    if (DirectoryExists(GetDirectoryPath(dstPath))) result = 0; // Already exists
-    else result = MakeDirectory(GetDirectoryPath(dstPath));
-
-    if (result == 0) // Directory created successfully or already exists
+    if ((srcFileData != NULL) && (srcDataSize > 0))
     {
-        if ((srcFileData != NULL) && (srcDataSize > 0))
+        // Get full destination directory path
+        const char *dstDirPath = GetDirectoryPath(dstPath);
+        
+        // Check if directory exist or create it otherwise
+        if (DirectoryExists(dstDirPath) || (MakeDirectory(dstDirPath) == 0))
         {
             bool saved = SaveFileData(dstPath, srcFileData, srcDataSize);
-            if (saved) result = 0;
+            if (saved) result = 0; // WARNING: SaveFileData() returns true on success
         }
     }
 
@@ -2301,9 +2303,12 @@ int FileTextReplace(const char *fileName, const char *search, const char *replac
     {
         fileText = LoadFileText(fileName);
         fileTextUpdated = TextReplaceAlloc(fileText, search, replacement);
-        bool saved = SaveFileText(fileName, fileTextUpdated);
-        if (saved) result = 0;
-        MemFree(fileTextUpdated);
+        if (fileTextUpdated != NULL)
+        {
+            bool saved = SaveFileText(fileName, fileTextUpdated);
+            if (saved) result = 0;
+            MemFree(fileTextUpdated);
+        }
         UnloadFileText(fileText);
     }
 #else
@@ -2322,9 +2327,12 @@ int FileTextFindIndex(const char *fileName, const char *search)
     if (FileExists(fileName))
     {
         char *fileText = LoadFileText(fileName);
-        char *ptr = strstr(fileText, search);
-        if (ptr != NULL) result = (int)(ptr - fileText);
-        UnloadFileText(fileText);
+        if (fileText != NULL)
+        {
+            char *ptr = strstr(fileText, search);
+            if (ptr != NULL) result = (int)(ptr - fileText);
+            UnloadFileText(fileText);
+        }
     }
 
     return result;
@@ -2412,6 +2420,24 @@ bool IsFileExtension(const char *fileName, const char *ext)
     return result;
 }
 
+// Check if file path (file or directory) is hidden by OS
+bool IsFileHidden(const char *filePath)
+{
+    bool result = false;
+#if defined(_WIN32)
+    unsigned long attribs = GetFileAttributesA(filePath);
+
+    // Check !INVALID_FILE_ATTRIBUTES and FILE_ATTRIBUTE_HIDDEN
+    if ((attribs != -1) && ((attribs & 0x2UL) != 0)) result = true;
+#else
+    const char *basePath = strrchr(filePath, '/');
+    basePath = ((basePath != NULL)? basePath + 1 : filePath);
+
+    if ((basePath[0] == '.') && (strcmp(basePath, ".") != 0) && (strcmp(basePath, "..") != 0)) result = true;
+#endif
+    return result;
+}
+
 // Check if directory path exists
 bool DirectoryExists(const char *dirPath)
 {
@@ -2475,9 +2501,11 @@ long GetFileModTime(const char *fileName)
 // WARNING: Getting the pointer to the input string extension position (not a string copy)
 const char *GetFileExtension(const char *fileName)
 {
-    const char *dot = strrchr(fileName, '.');
+    // Only the file name part can contain the extension, not a directory name
+    const char *name = GetFileName(fileName);
+    const char *dot = strrchr(name, '.');
 
-    if (!dot || (dot == fileName)) return NULL;
+    if ((dot == NULL) || (dot == name)) return NULL;     // No extension for hidden files: ".gitignore"
 
     return dot;
 }
@@ -2487,7 +2515,7 @@ static const char *strprbrk(const char *text, const char *charset)
 {
     const char *latestMatch = NULL;
 
-    for (; (text != NULL) && (text = strpbrk(text, charset)); latestMatch = text++) { }
+    for (; (text != NULL) && ((text = strpbrk(text, charset)) != NULL); latestMatch = text++) { }
 
     return latestMatch;
 }
@@ -2549,7 +2577,8 @@ const char *GetDirectoryPath(const char *filePath)
 
     // In case provided path does not contain a root drive letter (C:\, D:\)
     // nor leading path separator (\, /), add the current directory path to dirPath
-    if ((filePath[1] != ':') && (filePath[0] != '\\') && (filePath[0] != '/'))
+    bool isRelative = (filePath[0] != '\\') && (filePath[0] != '/') && ((filePath[0] == '\0') || (filePath[1] != ':'));
+    if (isRelative)
     {
         // For security, set starting path to current directory,
         // obtained path will be concatenated to this
@@ -2558,7 +2587,7 @@ const char *GetDirectoryPath(const char *filePath)
     }
 
     lastSlash = strprbrk(filePath, "\\/");
-    if (lastSlash)
+    if (lastSlash != NULL)
     {
         if (lastSlash == filePath)
         {
@@ -2568,10 +2597,19 @@ const char *GetDirectoryPath(const char *filePath)
         }
         else
         {
-            char *dirPathPtr = dirPath;
-            if ((filePath[1] != ':') && (filePath[0] != '\\') && (filePath[0] != '/')) dirPathPtr += 2;     // Skip drive letter, "C:"
-            memcpy(dirPathPtr, filePath, strlen(filePath) - (strlen(lastSlash) - 1));
-            dirPath[strlen(filePath) - strlen(lastSlash) + (((filePath[1] != ':') && (filePath[0] != '\\') && (filePath[0] != '/'))? 2 : 0)] = '\0';  // Add '\0' manually
+            int dirPathOffset = isRelative? 2 : 0;          // Skip "./" added for relative paths
+            int dirPathLength = (int)(lastSlash - filePath);
+
+            if ((dirPathOffset + dirPathLength) < MAX_FILEPATH_LENGTH)
+            {
+                memcpy(dirPath + dirPathOffset, filePath, dirPathLength);
+                dirPath[dirPathOffset + dirPathLength] = '\0';
+            }
+            else
+            {
+                TRACELOG(LOG_WARNING, "FILEIO: Directory path too long");
+                dirPath[0] = '\0';
+            }
         }
     }
 
@@ -2583,19 +2621,28 @@ const char *GetPrevDirectoryPath(const char *dirPath)
 {
     static char prevDirPath[MAX_FILEPATH_LENGTH] = { 0 };
     memset(prevDirPath, 0, MAX_FILEPATH_LENGTH);
-    int dirPathLength = (int)strlen(dirPath);
 
-    if (dirPathLength <= 3) snprintf(prevDirPath, MAX_FILEPATH_LENGTH, "%s", dirPath);
-
-    for (int i = (dirPathLength - 1); (i >= 0) && (dirPathLength > 3); i--)
+    const int lastIndex = (int)strlen(dirPath) - 1;
+    bool isFile = IsPathFile(dirPath);
+    for (int i = lastIndex; i >= 0; i--)
     {
+        // If the character is a path separator.
         if ((dirPath[i] == '\\') || (dirPath[i] == '/'))
         {
-            // Check for root: "C:\" or "/"
-            if (((i == 2) && (dirPath[1] ==':')) || (i == 0)) i++;
+            // If this character is a leading '/' (e.g. the '/' in "/usr") or
+            // part of a drive root (e.g. "C:\"), include it with the result.
+            if ((i == 0) || ((i == 2) && (dirPath[1] == ':'))) i += 1;
+            // If this character is a trailing path separator (e.g. the last
+            // '/' in "/usr/bin/" or the last '\' in "C:\raylib\"), continue.
+            else if (i == lastIndex) continue;
 
-            memcpy(prevDirPath, dirPath, i);
-            break;
+            if (!isFile)
+            {
+                if (i < MAX_FILEPATH_LENGTH) memcpy(prevDirPath, dirPath, i);
+                else TRACELOG(LOG_WARNING, "FILEIO: Directory path too long");
+                break;
+            }
+            else isFile = false;
         }
     }
 
@@ -2846,7 +2893,8 @@ bool IsPathDirectory(const char *path)
 {
     bool result = false;
 
-    if (!IsPathFile(path)) result = true;
+    struct stat info = { 0 };
+    if ((stat(path, &info) == 0) && S_ISDIR(info.st_mode)) result = true;
 
     return result;
 }
@@ -2862,7 +2910,7 @@ bool IsPathAbsolute(const char *path)
         // Check UNC path (\\server\share)
         if ((path[0] == '\\') && (path[1] == '\\')) result = true;
         // Check path starts with a drive letter (e.g. C:\ or D:/)
-        else if ((((path[0] >= 'A') && (path[0] <= 'Z')) || ((path[0] >= 'a') && (path[0] <= 'z'))) && 
+        else if ((((path[0] >= 'A') && (path[0] <= 'Z')) || ((path[0] >= 'a') && (path[0] <= 'z'))) &&
                  (path[1] != '\0') && (path[1] == ':') && (path[2] != '\0') && ((path[2] == '\\') || (path[2] == '/'))) result = true;
 #else
         // Check POSIX path, must start with /
@@ -3091,7 +3139,6 @@ char *EncodeDataBase64(const unsigned char *data, int dataSize, int *outputSize)
 
     // Load some memory to store encoded string
     char *encodedData = (char *)RL_CALLOC(estimatedOutputSize, 1);
-    if (encodedData == NULL) return NULL;
 
     int outputCount = 0;
     for (int i = 0; i < dataSize;)
@@ -3152,14 +3199,14 @@ unsigned char *DecodeDataBase64(const char *text, int *outputSize)
     int dataSize = (int)strlen(text); // WARNING: Expecting NULL terminated strings!
     int ending = dataSize - 1;
     int padding = 0;
-    while (text[ending] == '=') { padding++; ending--; }
+    while ((ending >= 0) && (text[ending] == '=')) { padding++; ending--; }
     int estimatedOutputSize = 3*(dataSize/4) - padding;
+    if (estimatedOutputSize < 0) estimatedOutputSize = 0;   // Invalid input, i.e. "QQ=" or "===="
     int maxOutputSize = 3*(dataSize/4);
 
     // Load some memory to store decoded data
     // NOTE: Allocated enough size to include padding
     unsigned char *decodedData = (unsigned char *)RL_CALLOC(maxOutputSize, 1);
-    if (decodedData == NULL) return NULL;
 
     int outputCount = 0;
     for (int i = 0; i < dataSize;)
@@ -3508,7 +3555,7 @@ unsigned int *ComputeSHA256(const unsigned char *data, int dataSize)
     hash[7] = 0x5be0cd19;
 
     const unsigned long long bitLen = 8ULL*dataSize;
-    unsigned long long paddedSize = dataSize + sizeof(dataSize);
+    unsigned long long paddedSize = dataSize + sizeof(bitLen); // Reserve room for the 64 bit message length appended at the end
     paddedSize += (64 - (paddedSize%64));
     unsigned char *buffer = (unsigned char *)RL_CALLOC(paddedSize, sizeof(unsigned char));
 
@@ -3720,6 +3767,8 @@ bool ExportAutomationEventList(AutomationEventList list, const char *fileName)
     byteCount += sprintf(txtData + byteCount, "c %i\n", list.count);
     for (unsigned int i = 0; i < list.count; i++)
     {
+        if ((list.events[i].type < 0) || (list.events[i].type >= MAX_AUTOMATION_EVENT_TYPES)) list.events[i].type = 0;
+        
         byteCount += snprintf(txtData + byteCount, 256, "e %i %i %i %i %i %i // Event: %s\n", list.events[i].frame, list.events[i].type,
             list.events[i].params[0], list.events[i].params[1], list.events[i].params[2], list.events[i].params[3], autoEventTypeName[list.events[i].type]);
     }
@@ -4200,8 +4249,8 @@ float GetMouseWheelMove(void)
 {
     float result = 0.0f;
 
-    if (fabsf(CORE.Input.Mouse.currentWheelMove.x) > fabsf(CORE.Input.Mouse.currentWheelMove.y)) result = (float)CORE.Input.Mouse.currentWheelMove.x;
-    else result = (float)CORE.Input.Mouse.currentWheelMove.y;
+    if (fabsf(CORE.Input.Mouse.currentWheelMove.x) > fabsf(CORE.Input.Mouse.currentWheelMove.y)) result = CORE.Input.Mouse.currentWheelMove.x;
+    else result = CORE.Input.Mouse.currentWheelMove.y;
 
     return result;
 }
@@ -4307,7 +4356,7 @@ void SetupViewport(int width, int height)
 
     // Set orthographic projection to current framebuffer size
     // NOTE: Configured top-left corner as (0, 0)
-    rlOrtho(0, CORE.Window.render.width, CORE.Window.render.height, 0, 0.0f, 1.0f);
+    rlOrtho(0.0f, (float)CORE.Window.render.width, (float)CORE.Window.render.height, 0.0f, 0.0f, 1.0f);
 
     rlMatrixMode(RL_MODELVIEW);         // Switch back to modelview matrix
     rlLoadIdentity();                   // Reset current matrix (modelview)
@@ -4543,7 +4592,7 @@ static void RecordAutomationEvent(void)
         if ((CORE.Input.Gamepad.currentState[gamepad] != CORE.Input.Gamepad.previousState[gamepad]) &&
             (CORE.Input.Gamepad.currentState[gamepad])) // Check if changed to ready
         {
-            // TODO: Save gamepad connect event
+            // TODO: Automation event: Save gamepad connect event
         }
         */
 
@@ -4552,7 +4601,7 @@ static void RecordAutomationEvent(void)
         if ((CORE.Input.Gamepad.currentState[gamepad] != CORE.Input.Gamepad.previousState[gamepad]) &&
             (!CORE.Input.Gamepad.currentState[gamepad])) // Check if changed to not-ready
         {
-            // TODO: Save gamepad disconnect event
+            // TODO: Automation event: Save gamepad disconnect event
         }
         */
 

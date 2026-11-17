@@ -3,9 +3,9 @@
     <Defines count="56">
         <Define name="RAYLIB_H" type="GUARD" value="" desc="" />
         <Define name="RAYLIB_VERSION_MAJOR" type="INT" value="6" desc="" />
-        <Define name="RAYLIB_VERSION_MINOR" type="INT" value="1" desc="" />
+        <Define name="RAYLIB_VERSION_MINOR" type="INT" value="5" desc="" />
         <Define name="RAYLIB_VERSION_PATCH" type="INT" value="0" desc="" />
-        <Define name="RAYLIB_VERSION" type="STRING" value="6.1-dev" desc="" />
+        <Define name="RAYLIB_VERSION" type="STRING" value="6.5-dev" desc="" />
         <Define name="__declspec(x)" type="MACRO" value="__attribute__((x))" desc="" />
         <Define name="RLAPI" type="UNKNOWN" value="__declspec(dllexport)" desc="Building the library as a Win32 shared library (.dll)" />
         <Define name="PI" type="FLOAT" value="3.14159265358979323846" desc="" />
@@ -154,7 +154,7 @@
             <Field type="int" name="projection" desc="Camera projection: CAMERA_PERSPECTIVE or CAMERA_ORTHOGRAPHIC" />
         </Struct>
         <Struct name="Camera2D" fieldCount="4" desc="Camera2D, defines position/orientation in 2d space">
-            <Field type="Vector2" name="offset" desc="Camera offset (screen space offset from window origin)" />
+            <Field type="Vector2" name="offset" desc="Camera offset (screen space offset from window origin, unscaled by DPI, real pixel size)" />
             <Field type="Vector2" name="target" desc="Camera target (world space target point that is mapped to screen space offset)" />
             <Field type="float" name="rotation" desc="Camera rotation in degrees (pivots around target)" />
             <Field type="float" name="zoom" desc="Camera zoom (scaling around target), must not be set to 0, set to 1.0f for no scale" />
@@ -303,7 +303,7 @@
         <Alias type="TextureCubemap" name="Texture" desc="TextureCubemap, same as Texture" />
         <Alias type="RenderTexture2D" name="RenderTexture" desc="RenderTexture2D, same as RenderTexture" />
         <Alias type="Camera" name="Camera3D" desc="Camera type fallback, defaults to Camera3D" />
-        <Alias type="*ModelAnimPose" name="Transform" desc="Anim pose, an array of Transform[]" />
+        <Alias type="ModelAnimPose" name="Transform *" desc="Anim pose, an array of Transform[]" />
     </Aliases>
     <Enums count="21">
         <Enum name="ConfigFlags" valueCount="16" desc="System/Window config flags">
@@ -681,7 +681,7 @@
             <Param type="unsigned int" name="frames" desc="" />
         </Callback>
     </Callbacks>
-    <Functions count="613">
+    <Functions count="619">
         <Function name="InitWindow" retType="void" paramCount="3" desc="Initialize window and OpenGL context">
             <Param type="int" name="width" desc="" />
             <Param type="int" name="height" desc="" />
@@ -984,7 +984,7 @@
         <Function name="TakeScreenshot" retType="void" paramCount="1" desc="Takes a screenshot of current screen (filename extension defines format)">
             <Param type="const char *" name="fileName" desc="" />
         </Function>
-        <Function name="SetConfigFlags" retType="void" paramCount="1" desc="Set up init configuration flags (view FLAGS)">
+        <Function name="SetConfigFlags" retType="void" paramCount="1" desc="Set init configuration flags (view FLAGS)">
             <Param type="unsigned int" name="flags" desc="" />
         </Function>
         <Function name="OpenURL" retType="void" paramCount="1" desc="Open URL with default system browser (if available)">
@@ -1083,6 +1083,9 @@
         <Function name="IsFileExtension" retType="bool" paramCount="2" desc="Check file extension (recommended include point: .png, .wav)">
             <Param type="const char *" name="fileName" desc="" />
             <Param type="const char *" name="ext" desc="" />
+        </Function>
+        <Function name="IsFileHidden" retType="bool" paramCount="1" desc="Check if file path (file or directory) is hidden by OS">
+            <Param type="const char *" name="filePath" desc="" />
         </Function>
         <Function name="GetFileLength" retType="int" paramCount="1" desc="Get file length in bytes (NOTE: GetFileSize() conflicts with windows.h)">
             <Param type="const char *" name="fileName" desc="" />
@@ -1428,6 +1431,13 @@
             <Param type="Vector2" name="v3" desc="" />
             <Param type="Color" name="color" desc="" />
         </Function>
+        <Function name="DrawTriangleLinesEx" retType="void" paramCount="5" desc="Draw triangle outline with line thickness, counter-clockwise vertex order">
+            <Param type="Vector2" name="v1" desc="" />
+            <Param type="Vector2" name="v2" desc="" />
+            <Param type="Vector2" name="v3" desc="" />
+            <Param type="float" name="thick" desc="" />
+            <Param type="Color" name="color" desc="" />
+        </Function>
         <Function name="DrawTriangleFan" retType="void" paramCount="3" desc="Draw a triangle fan defined by points (first vertex is the center)">
             <Param type="const Vector2 *" name="points" desc="" />
             <Param type="int" name="pointCount" desc="" />
@@ -1569,6 +1579,15 @@
             <Param type="int" name="segments" desc="" />
             <Param type="Color" name="color" desc="" />
         </Function>
+        <Function name="DrawCircleSectorLinesEx" retType="void" paramCount="7" desc="Draw circle sector outline with thickness">
+            <Param type="Vector2" name="center" desc="" />
+            <Param type="float" name="radius" desc="" />
+            <Param type="float" name="startAngle" desc="" />
+            <Param type="float" name="endAngle" desc="" />
+            <Param type="int" name="segments" desc="" />
+            <Param type="float" name="thick" desc="" />
+            <Param type="Color" name="color" desc="" />
+        </Function>
         <Function name="DrawCircleLines" retType="void" paramCount="4" desc="Draw circle outline">
             <Param type="int" name="centerX" desc="" />
             <Param type="int" name="centerY" desc="" />
@@ -1612,6 +1631,13 @@
             <Param type="float" name="radiusV" desc="" />
             <Param type="Color" name="color" desc="" />
         </Function>
+        <Function name="DrawEllipseLinesEx" retType="void" paramCount="5" desc="Draw ellipse outline with line thickness">
+            <Param type="Vector2" name="center" desc="" />
+            <Param type="float" name="radiusH" desc="" />
+            <Param type="float" name="radiusV" desc="" />
+            <Param type="float" name="thick" desc="" />
+            <Param type="Color" name="color" desc="" />
+        </Function>
         <Function name="DrawRing" retType="void" paramCount="7" desc="Draw ring">
             <Param type="Vector2" name="center" desc="" />
             <Param type="float" name="innerRadius" desc="" />
@@ -1628,6 +1654,16 @@
             <Param type="float" name="startAngle" desc="" />
             <Param type="float" name="endAngle" desc="" />
             <Param type="int" name="segments" desc="" />
+            <Param type="Color" name="color" desc="" />
+        </Function>
+        <Function name="DrawRingLinesEx" retType="void" paramCount="8" desc="Draw ring outline with line thickness">
+            <Param type="Vector2" name="center" desc="" />
+            <Param type="float" name="innerRadius" desc="" />
+            <Param type="float" name="outerRadius" desc="" />
+            <Param type="float" name="startAngle" desc="" />
+            <Param type="float" name="endAngle" desc="" />
+            <Param type="int" name="segments" desc="" />
+            <Param type="float" name="thick" desc="" />
             <Param type="Color" name="color" desc="" />
         </Function>
         <Function name="DrawSplineLinear" retType="void" paramCount="4" desc="Draw spline: Linear, minimum 2 points">
@@ -2272,6 +2308,11 @@
         <Function name="LoadRenderTexture" retType="RenderTexture2D" paramCount="2" desc="Load texture for rendering (framebuffer)">
             <Param type="int" name="width" desc="" />
             <Param type="int" name="height" desc="" />
+        </Function>
+        <Function name="LoadRenderTextureEx" retType="RenderTexture2D" paramCount="3" desc="Load texture for rendering (framebuffer), with specific format">
+            <Param type="int" name="width" desc="" />
+            <Param type="int" name="height" desc="" />
+            <Param type="int" name="format" desc="" />
         </Function>
         <Function name="IsTextureValid" retType="bool" paramCount="1" desc="Check if texture is valid (loaded in GPU)">
             <Param type="Texture2D" name="texture" desc="" />

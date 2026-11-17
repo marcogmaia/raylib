@@ -285,7 +285,6 @@ static int android_close(void *cookie);
 //       CMake: handled automatically — the PUBLIC flag propagates as INTERFACE_LINK_OPTIONS
 //              to the consumer's final link via target_link_libraries
 //        Make: pass -Wl,--wrap=fopen to the linker command producing the final artifact
-//   build.zig: pass -Wl,--wrap=fopen to the linker command producing the final artifact
 //      custom: pass -Wl,--wrap=fopen to the linker command producing the final artifact
 //
 // SHARED library (.so) — wrapping is self-contained:
@@ -296,8 +295,6 @@ static int android_close(void *cookie);
 //              only raylib internals are wrapped, app code requires a separate flag
 //        Make: handled automatically — src/Makefile sets LDFLAGS += -Wl,--wrap=fopen;
 //              only raylib internals are wrapped, app code requires a separate flag
-//   build.zig: NOT supported — std.Build has no dedicated linker wrap helper, the flag
-//              is not correctly applied at the .so link step
 //      custom: apply -Wl,--wrap=fopen to the linker command producing the .so
 FILE *__real_fopen(const char *fileName, const char *mode); // Real fopen, provided by the linker (--wrap=fopen)
 FILE *__wrap_fopen(const char *fileName, const char *mode); // Replacement for fopen()
@@ -586,9 +583,43 @@ Vector2 GetWindowScaleDPI(void)
 }
 
 // Set clipboard text content
+// NOTE: Implementation based on https://stackoverflow.com/questions/76759222/how-to-copy-to-clipboard-on-android-via-jni
 void SetClipboardText(const char *text)
 {
-    TRACELOG(LOG_WARNING, "SetClipboardText() not implemented on target platform");
+    JNIEnv *env = NULL;
+    JavaVM *vm = platform.app->activity->vm;
+    jint result = (*vm)->AttachCurrentThread(vm, &env, NULL);
+    if (result != JNI_OK) {
+        TRACELOG(LOG_WARNING, "Failed to allocate a thread to set the clipboard text");
+        return;
+    }
+    jobject activity = platform.app->activity->clazz;
+    if (!activity) {
+        TRACELOG(LOG_WARNING, "Failed to get Android activity class reference");
+        (*vm)->DetachCurrentThread(vm);
+        return;
+    }
+
+    // ClipboardManager
+    jclass activityClass = (*env)->GetObjectClass(env, activity);
+    jmethodID getSystemService = (*env)->GetMethodID(env, activityClass, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+    jstring serviceName = (*env)->NewStringUTF(env, "clipboard");
+    jobject clipboard = (*env)->CallObjectMethod(env, activity, getSystemService, serviceName);
+
+    // ClipData
+    jclass clipDataClass = (*env)->FindClass(env, "android/content/ClipData");
+    jmethodID newPlainText = (*env)->GetStaticMethodID(env, clipDataClass, "newPlainText", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Landroid/content/ClipData;");
+    const char *windowTitle = (CORE.Window.title != NULL) ? CORE.Window.title : "raylib";
+    jstring label = (*env)->NewStringUTF(env, windowTitle);
+    jstring textString = (*env)->NewStringUTF(env, text);
+    jobject clip = (*env)->CallStaticObjectMethod(env, clipDataClass, newPlainText, label, textString);
+
+    // cm.setPrimaryClip(clip)
+    jclass clipboardClass = (*env)->FindClass(env, "android/content/ClipboardManager");
+    jmethodID setPrimaryClip = (*env)->GetMethodID(env, clipboardClass, "setPrimaryClip", "(Landroid/content/ClipData;)V");
+    (*env)->CallVoidMethod(env, clipboard, setPrimaryClip, clip);
+
+    (*vm)->DetachCurrentThread(vm);
 }
 
 // Get clipboard text content
@@ -757,12 +788,12 @@ void PollInputEvents(void)
     for (int i = 0; i < MAX_KEYBOARD_KEYS; i++) CORE.Input.Keyboard.keyRepeatInFrame[i] = 0;
 
     // Reset last gamepad button/axis registered state
-    CORE.Input.Gamepad.lastButtonPressed = 0;       // GAMEPAD_BUTTON_UNKNOWN
+    CORE.Input.Gamepad.lastButtonPressed = 0; // GAMEPAD_BUTTON_UNKNOWN
     //CORE.Input.Gamepad.axisCount = 0;
 
     for (int i = 0; i < MAX_GAMEPADS; i++)
     {
-        if (CORE.Input.Gamepad.ready[i])     // Check if gamepad is available
+        if (CORE.Input.Gamepad.ready[i]) // Check if gamepad is available
         {
             // Register previous gamepad states
             for (int k = 0; k < MAX_GAMEPAD_BUTTONS; k++)
@@ -801,6 +832,7 @@ void PollInputEvents(void)
         if (platform.app->destroyRequested != 0)
         {
             CORE.Window.shouldClose = true;
+            break;
         }
     }
 }

@@ -25,7 +25,7 @@ Functions params | lowerCase | `width`, `height`
 Ternary Operator | (condition)? result1 : result2 | `printf("Value is 0: %s", (value == 0)? "yes" : "no");`
 
 Some other conventions to follow:
- - **ALWAYS** initialize all defined variables.
+ - **ALWAYS** initialize all defined variables, avoid defining variables in same code line, use multiple lines.
  - **Do not use TABS**, use 4 spaces instead.
  - Avoid trailing spaces, please, avoid them
  - Comments always start with space + capital letter and never end with a '.', place them **before** the line(s) they refer to
@@ -69,6 +69,15 @@ void SomeFunction()
    // TODO: Do something here!
 }
 ```
+ - When checking pointers, use full verbose check against `NULL`
+```c
+if (dataPtr != NULL)
+{
+    RL_FREE(dataPtr);
+    dataPtr = NULL;
+}
+```
+ - Memory allocation return value checks: no checks are done, the probabilities of allocators failing are very low and it would add a great amount of checking code, if a finer control is needed for allocators, macors can be overriden by custom implementations.
 
 **If proposing new functions, please try to use a clear naming for function-name and functions-parameters, in case of doubt, open an issue for discussion.**
 

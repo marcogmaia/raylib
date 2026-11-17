@@ -15,7 +15,7 @@ return {
     {
       name = "RAYLIB_VERSION_MINOR",
       type = "INT",
-      value = 1,
+      value = 5,
       description = ""
     },
     {
@@ -27,7 +27,7 @@ return {
     {
       name = "RAYLIB_VERSION",
       type = "STRING",
-      value = "6.1-dev",
+      value = "6.5-dev",
       description = ""
     },
     {
@@ -763,7 +763,7 @@ return {
         {
           type = "Vector2",
           name = "offset",
-          description = "Camera offset (screen space offset from window origin)"
+          description = "Camera offset (screen space offset from window origin, unscaled by DPI, real pixel size)"
         },
         {
           type = "Vector2",
@@ -1411,8 +1411,8 @@ return {
       description = "Camera type fallback, defaults to Camera3D"
     },
     {
-      type = "Transform",
-      name = "*ModelAnimPose",
+      type = "Transform *",
+      name = "ModelAnimPose",
       description = "Anim pose, an array of Transform[]"
     }
   },
@@ -3855,7 +3855,7 @@ return {
     },
     {
       name = "SetConfigFlags",
-      description = "Set up init configuration flags (view FLAGS)",
+      description = "Set init configuration flags (view FLAGS)",
       returnType = "void",
       params = {
         {type = "unsigned int", name = "flags"}
@@ -4091,6 +4091,14 @@ return {
       params = {
         {type = "const char *", name = "fileName"},
         {type = "const char *", name = "ext"}
+      }
+    },
+    {
+      name = "IsFileHidden",
+      description = "Check if file path (file or directory) is hidden by OS",
+      returnType = "bool",
+      params = {
+        {type = "const char *", name = "filePath"}
       }
     },
     {
@@ -4896,6 +4904,18 @@ return {
       }
     },
     {
+      name = "DrawTriangleLinesEx",
+      description = "Draw triangle outline with line thickness, counter-clockwise vertex order",
+      returnType = "void",
+      params = {
+        {type = "Vector2", name = "v1"},
+        {type = "Vector2", name = "v2"},
+        {type = "Vector2", name = "v3"},
+        {type = "float", name = "thick"},
+        {type = "Color", name = "color"}
+      }
+    },
+    {
       name = "DrawTriangleFan",
       description = "Draw a triangle fan defined by points (first vertex is the center)",
       returnType = "void",
@@ -5147,6 +5167,20 @@ return {
       }
     },
     {
+      name = "DrawCircleSectorLinesEx",
+      description = "Draw circle sector outline with thickness",
+      returnType = "void",
+      params = {
+        {type = "Vector2", name = "center"},
+        {type = "float", name = "radius"},
+        {type = "float", name = "startAngle"},
+        {type = "float", name = "endAngle"},
+        {type = "int", name = "segments"},
+        {type = "float", name = "thick"},
+        {type = "Color", name = "color"}
+      }
+    },
+    {
       name = "DrawCircleLines",
       description = "Draw circle outline",
       returnType = "void",
@@ -5225,6 +5259,18 @@ return {
       }
     },
     {
+      name = "DrawEllipseLinesEx",
+      description = "Draw ellipse outline with line thickness",
+      returnType = "void",
+      params = {
+        {type = "Vector2", name = "center"},
+        {type = "float", name = "radiusH"},
+        {type = "float", name = "radiusV"},
+        {type = "float", name = "thick"},
+        {type = "Color", name = "color"}
+      }
+    },
+    {
       name = "DrawRing",
       description = "Draw ring",
       returnType = "void",
@@ -5249,6 +5295,21 @@ return {
         {type = "float", name = "startAngle"},
         {type = "float", name = "endAngle"},
         {type = "int", name = "segments"},
+        {type = "Color", name = "color"}
+      }
+    },
+    {
+      name = "DrawRingLinesEx",
+      description = "Draw ring outline with line thickness",
+      returnType = "void",
+      params = {
+        {type = "Vector2", name = "center"},
+        {type = "float", name = "innerRadius"},
+        {type = "float", name = "outerRadius"},
+        {type = "float", name = "startAngle"},
+        {type = "float", name = "endAngle"},
+        {type = "int", name = "segments"},
+        {type = "float", name = "thick"},
         {type = "Color", name = "color"}
       }
     },
@@ -6481,6 +6542,16 @@ return {
       params = {
         {type = "int", name = "width"},
         {type = "int", name = "height"}
+      }
+    },
+    {
+      name = "LoadRenderTextureEx",
+      description = "Load texture for rendering (framebuffer), with specific format",
+      returnType = "RenderTexture2D",
+      params = {
+        {type = "int", name = "width"},
+        {type = "int", name = "height"},
+        {type = "int", name = "format"}
       }
     },
     {
