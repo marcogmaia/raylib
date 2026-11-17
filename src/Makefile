@@ -849,7 +849,7 @@ endif
 rcore.o : platforms/*.c
 
 # Compile core module
-rcore.o : rcore.c raylib.h rlgl.h raymath.h rcamera.h rgestures.h
+rcore.o : rcore.c raylib.h raylib_sdl.h rlgl.h raymath.h rcamera.h rgestures.h
 	$(CC) -c $< $(CFLAGS) $(INCLUDE_PATHS)
 
 # Compile rglfw module
@@ -943,6 +943,7 @@ ifeq ($(ROOT),root)
         endif
         # Copying raylib development files to $(RAYLIB_H_INSTALL_PATH).
 		cp --update raylib.h $(RAYLIB_H_INSTALL_PATH)/raylib.h
+		cp --update raylib_sdl.h $(RAYLIB_H_INSTALL_PATH)/raylib_sdl.h
 		cp --update raymath.h $(RAYLIB_H_INSTALL_PATH)/raymath.h
 		cp --update rcamera.h $(RAYLIB_H_INSTALL_PATH)/rcamera.h
 		cp --update rlgl.h $(RAYLIB_H_INSTALL_PATH)/rlgl.h
@@ -971,6 +972,7 @@ ifeq ($(ROOT),root)
 			rm --force --interactive --verbose $(RAYLIB_INSTALL_PATH)/libraylib.a
         endif
 		rm --force --interactive --verbose $(RAYLIB_H_INSTALL_PATH)/raylib.h
+		rm --force --interactive --verbose $(RAYLIB_H_INSTALL_PATH)/raylib_sdl.h
 		rm --force --interactive --verbose $(RAYLIB_H_INSTALL_PATH)/raymath.h
 		rm --force --interactive --verbose $(RAYLIB_H_INSTALL_PATH)/rcamera.h
 		rm --force --interactive --verbose $(RAYLIB_H_INSTALL_PATH)/rlgl.h

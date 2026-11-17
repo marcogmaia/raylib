@@ -123,6 +123,8 @@ typedef struct {
 extern CoreData CORE;                   // Global CORE state context
 
 static PlatformData platform = { 0 };   // Platform specific data
+static RaylibSDLEventCallback sdlEventCallback = NULL;
+static void *sdlEventCallbackUserData = NULL;
 
 static const KeyboardKey mapScancodeToKey[SCANCODE_MAPPED_NUM] = {
     KEY_NULL,           // SDL_SCANCODE_UNKNOWN
@@ -1413,6 +1415,13 @@ const char *GetKeyName(int key)
     return SDL_GetKeyName(key);
 }
 
+// Set the optional SDL event callback
+void SetSDLEventCallback(RaylibSDLEventCallback callback, void *userData)
+{
+    sdlEventCallback = callback;
+    sdlEventCallbackUserData = callback? userData : NULL;
+}
+
 // Register all input events
 void PollInputEvents(void)
 {
@@ -1483,6 +1492,7 @@ void PollInputEvents(void)
 
     if ((CORE.Window.eventWaiting) || (FLAG_IS_SET(CORE.Window.flags, FLAG_WINDOW_MINIMIZED) && !FLAG_IS_SET(CORE.Window.flags, FLAG_WINDOW_ALWAYS_RUN)))
     {
+        // NULL leaves the event queued for SDL_PollEvent and the callback.
         SDL_WaitEvent(NULL);
         CORE.Time.previous = GetTime();
     }
@@ -1490,6 +1500,8 @@ void PollInputEvents(void)
     SDL_Event event = { 0 };
     while (SDL_PollEvent(&event) != 0)
     {
+        if (sdlEventCallback != NULL) sdlEventCallback(&event, sdlEventCallbackUserData);
+
         // All input events can be processed after polling
         switch (event.type)
         {
@@ -2219,6 +2231,7 @@ int InitPlatform(void)
 // Close platform
 void ClosePlatform(void)
 {
+    SetSDLEventCallback(NULL, NULL);
     SDL_FreeCursor(platform.cursor); // Free cursor
 
     if (platform.glContext != NULL) SDL_GL_DeleteContext(platform.glContext); // Deinitialize OpenGL context

@@ -523,6 +523,7 @@ const char *TextFormat(const char *text, ...); // Formatting of text with variab
 #if defined(PLATFORM_DESKTOP_GLFW)
     #include "platforms/rcore_desktop_glfw.c"
 #elif defined(PLATFORM_DESKTOP_SDL)
+    #include "raylib_sdl.h"
     #include "platforms/rcore_desktop_sdl.c"
 #elif (defined(PLATFORM_DESKTOP_RGFW) || defined(PLATFORM_WEB_RGFW))
     #include "platforms/rcore_desktop_rgfw.c"
